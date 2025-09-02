@@ -41,9 +41,6 @@ async function startBot() {
     // Sauvegarde automatique des credentials
     sock.ev.on("creds.update", saveCreds);
 
-    // Lier le store
-    store.bind(sock.ev);
-
     // Gestion des messages entrants
     sock.ev.on("messages.upsert", async (m) => {
         const msg = m.messages[0];
