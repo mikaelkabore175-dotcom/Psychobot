@@ -1,34 +1,34 @@
 // index.js
 const makeWASocket = require("@whiskeysockets/baileys").default;
-const { useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
+const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
 const P = require("pino");
 const fs = require("fs");
 const path = require("path");
 
-// Auth automatique
-const { state, saveState } = useSingleFileAuthState(path.resolve(__dirname, 'auth_info.json'));
-
-// Store mémoire fonctionnel
-const store = makeCacheableSignalKeyStore(state, P({ level: 'silent' }));
-
 // Préfixe des commandes
 const PREFIX = "!";
-
-// Chargement dynamique des commandes
-const commands = new Map();
-const commandFiles = fs.existsSync(path.join(__dirname, "commands"))
-    ? fs.readdirSync(path.join(__dirname, "commands")).filter(f => f.endsWith(".js"))
-    : [];
-
-for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    if (command.name) commands.set(command.name, command);
-}
 
 // Numéro (info seulement)
 const PHONE_NUMBER = "237696814391";
 
 async function startBot() {
+    // Auth multi-fichiers
+    const { state, saveCreds } = await useMultiFileAuthState(path.resolve(__dirname, 'auth_info'));
+
+    // Store mémoire fonctionnel
+    const store = makeCacheableSignalKeyStore(state, P({ level: 'silent' }));
+
+    // Chargement dynamique des commandes
+    const commands = new Map();
+    const commandFiles = fs.existsSync(path.join(__dirname, "commands"))
+        ? fs.readdirSync(path.join(__dirname, "commands")).filter(f => f.endsWith(".js"))
+        : [];
+    for (const file of commandFiles) {
+        const command = require(`./commands/${file}`);
+        if (command.name) commands.set(command.name, command);
+    }
+
+    // Version WhatsApp
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
@@ -39,7 +39,7 @@ async function startBot() {
     });
 
     // Sauvegarde automatique des credentials
-    sock.ev.on("creds.update", saveState);
+    sock.ev.on("creds.update", saveCreds);
 
     // Lier le store
     store.bind(sock.ev);
