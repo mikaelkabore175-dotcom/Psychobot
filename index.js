@@ -2,6 +2,7 @@
 const express = require('express');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const qrcode = require("qrcode-terminal");
+const QRCode = require("qrcode");
 const pino = require("pino");
 const fs = require("fs");
 const path = require("path");
@@ -13,6 +14,8 @@ const PREFIX = "!";
 const BOT_NAME = "PSYCHO BOT";
 const BOT_TAG = `*${BOT_NAME}* 👨🏻‍💻`;
 const TARGET_NUMBER = "237696814391"; // Numéro cible pour MP3/mentions
+
+let latestQR = null; // Stocke le QR actuel
 
 // --- Loader de commandes ---
 const commands = new Map();
@@ -64,15 +67,19 @@ async function startBot() {
     sock.ev.on("connection.update", update => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
+            latestQR = qr; // On stocke le QR pour l’afficher sur /qr
             console.log("------------------------------------------------");
             qrcode.generate(qr, { small: true });
-            console.log("[QR] Scannez ce code avec WhatsApp.");
+            console.log("[QR] Nouveau QR généré. Ouvrez /qr pour le scanner.");
             console.log("------------------------------------------------");
         }
         if (connection === "close") {
             if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
             else console.log("Déconnecté, supprime auth_info pour reconnecter manuellement.");
-        } else if (connection === "open") console.log("✅ Bot connecté !");
+        } else if (connection === "open") {
+            latestQR = null; // plus besoin de QR une fois connecté
+            console.log("✅ Bot connecté !");
+        }
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -195,5 +202,55 @@ async function startBot() {
 // --- Serveur web ---
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 app.get('/', (req, res) => res.send({ status: "online", botName: BOT_NAME, uptime: (new Date() - startTime)/1000 }));
-app.listen(PORT, () => { console.log(`[WebServer] Démarré sur port ${PORT}`); startBot(); });
+
+// Route HTML pour afficher le QR avec auto-refresh dynamique
+app.get("/qr", async (req, res) => {
+    res.send(`
+        <html>
+        <head>
+            <title>QR WhatsApp</title>
+            <style>
+                body { display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif; }
+                img { width:300px; height:300px; margin:20px; }
+            </style>
+        </head>
+        <body>
+            <h2>Scannez ce QR pour connecter ${BOT_NAME}</h2>
+            <img id="qrImg" src="" />
+            <p>Le QR se met à jour automatiquement toutes les 10s</p>
+            <script>
+                async function fetchQR() {
+                    try {
+                        const res = await fetch('/qr-data');
+                        const data = await res.json();
+                        if(data.qr) document.getElementById('qrImg').src = data.qr;
+                        else document.getElementById('qrImg').alt = "Bot déjà connecté ✅";
+                    } catch(err) {
+                        console.error(err);
+                    }
+                }
+                fetchQR();
+                setInterval(fetchQR, 10000); // update toutes les 10s
+            </script>
+        </body>
+        </html>
+    `);
+});
+
+// Endpoint qui renvoie le QR en JSON
+app.get("/qr-data", async (req, res) => {
+    if (!latestQR) return res.json({ qr: null });
+    try {
+        const qrImage = await QRCode.toDataURL(latestQR);
+        res.json({ qr: qrImage });
+    } catch (err) {
+        res.json({ qr: null });
+    }
+});
+
+app.listen(PORT, () => { 
+    console.log(`[WebServer] Démarré sur port ${PORT}`); 
+    startBot(); 
+});
