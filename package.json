@@ -1,7 +1,7 @@
 {
   "name": "psycho-bot",
   "version": "1.1.0",
-  "description": "Bot WhatsApp autonome avec Baileys v6",
+  "description": "Bot WhatsApp autonome avec Baileys v6 (QR code)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
