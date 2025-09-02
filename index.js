@@ -14,10 +14,7 @@ app.listen(PORT, () => {
 });
 
 // ----- Bot WhatsApp -----
-const baileys = require("@whiskeysockets/baileys");
-const { default: makeWASocket, DisconnectReason, fetchLatestBaileysVersion } = baileys;
-// Correct import de useSingleFileAuthState
-const { useSingleFileAuthState } = require("@whiskeysockets/baileys/lib/Utils/auth_state");
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
 const P = require("pino");
 const fs = require("fs");
 const path = require("path");
@@ -44,9 +41,7 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        if (qr) {
-            console.log("📲 Scanner ce QR code avec WhatsApp :", qr);
-        }
+        if (qr) console.log("📲 Scanner ce QR code avec WhatsApp :", qr);
 
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
