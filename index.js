@@ -14,8 +14,7 @@ app.listen(PORT, () => {
 });
 
 // ----- Bot WhatsApp -----
-const makeWASocket = require("@whiskeysockets/baileys").default;
-const { DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
 const P = require("pino");
 const fs = require("fs");
 const path = require("path");
@@ -23,13 +22,36 @@ const path = require("path");
 // Préfixe des commandes
 const PREFIX = "!";
 
+// Authentification QR code
+const { state, saveState } = useSingleFileAuthState(path.resolve(__dirname, 'auth_info.json'));
+
 async function startBot() {
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
-        logger: P({ level: "silent" }),
-        printQRInTerminal: true  // QR code pour connexion
+        auth: state,
+        logger: P({ level: 'silent' })
+    });
+
+    // Sauvegarde automatique des credentials
+    sock.ev.on('creds.update', saveState);
+
+    // Gestion de la connexion et du QR code
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            console.log("Scan this QR code with WhatsApp:", qr); // Affiche le QR code dans les logs
+        }
+
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('Connexion fermée, reconnect ?', shouldReconnect);
+            if (shouldReconnect) startBot();
+        } else if (connection === 'open') {
+            console.log('Connecté au compte WhatsApp !');
+        }
     });
 
     // Chargement dynamique des commandes
@@ -60,18 +82,6 @@ async function startBot() {
                     }
                 }
             }
-        }
-    });
-
-    // Gestion de la connexion
-    sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === "close") {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log("Connexion fermée, reconnect ?", shouldReconnect);
-            if (shouldReconnect) startBot();
-        } else if (connection === "open") {
-            console.log("Connecté au compte WhatsApp !");
         }
     });
 }
