@@ -1,13 +1,20 @@
 {
   "name": "psycho-bot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Bot WhatsApp basé sur Baileys",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.7",
     "pino": "^8.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
