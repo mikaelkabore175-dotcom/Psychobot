@@ -1,4 +1,3 @@
-// index.js
 const makeWASocket = require("@whiskeysockets/baileys").default;
 const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
 const P = require("pino");
