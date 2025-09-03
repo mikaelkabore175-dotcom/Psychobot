@@ -6,9 +6,10 @@ const log = require('../logger')(module);
 
 module.exports = {
     name: 'extract',
-    description: 'Extrait et sauvegarde un média (image, vidéo ou voix), y compris view once.',
+    description: 'Extrait et sauvegarde un média (image, vidéo, audio, document), y compris view once.',
     adminOnly: false,
     run: async ({ sock, msg, replyWithTag }) => {
+        let tempPath;
         try {
             // --- Crée dossier temporaire ---
             const tempDir = path.join(__dirname, "../temp");
@@ -19,27 +20,34 @@ module.exports = {
             const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
 
             // --- Gérer view once ---
-            const mediaMsg = quoted.viewOnceMessage ? quoted.viewOnceMessage.message : quoted;
+            const mediaMsg = quoted.viewOnceMessage?.message 
+                          || quoted.viewOnceMessageV2?.message 
+                          || quoted;
 
             // --- Détecter type média ---
             const mediaType = mediaMsg.imageMessage ? 'image' :
                               mediaMsg.videoMessage ? 'video' :
-                              mediaMsg.audioMessage ? 'audio' : null;
+                              mediaMsg.audioMessage ? 'audio' :
+                              mediaMsg.documentMessage ? 'document' : null;
 
             if (!mediaType) {
-                return replyWithTag(sock, remoteJid, msg, "❌ Veuillez réagir à une image, vidéo ou note vocale (view once inclus).");
+                return replyWithTag(sock, remoteJid, msg, "❌ Veuillez réagir à une image, vidéo, audio ou document (view once inclus).");
             }
 
-            const ext = mediaType === 'image' ? 'jpg' :
-                        mediaType === 'video' ? 'mp4' : 'ogg';
-            const tempPath = path.join(tempDir, `media_${Date.now()}.${ext}`);
+            const mime = mediaMsg[`${mediaType}Message`]?.mimetype || '';
+            const ext = mime.split('/')[1] || (
+                mediaType === 'image' ? 'jpg' :
+                mediaType === 'video' ? 'mp4' :
+                mediaType === 'audio' ? 'ogg' : 'bin'
+            );
+            tempPath = path.join(tempDir, `media_${Date.now()}.${ext}`);
 
             await replyWithTag(sock, remoteJid, msg, '⏳ Téléchargement en cours...');
 
             // --- Télécharger le média ---
             let buffer = Buffer.from([]);
             const stream = await downloadContentFromMessage(
-                mediaMsg.imageMessage || mediaMsg.videoMessage || mediaMsg.audioMessage,
+                mediaMsg[`${mediaType}Message`],
                 mediaType
             );
             for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
@@ -51,7 +59,8 @@ module.exports = {
             let sendObj;
             if (mediaType === 'image') sendObj = { image: { url: tempPath }, caption: "📸 Média extrait" };
             else if (mediaType === 'video') sendObj = { video: { url: tempPath }, caption: "🎬 Média extrait" };
-            else sendObj = { audio: { url: tempPath }, mimetype: 'audio/ogg' };
+            else if (mediaType === 'audio') sendObj = { audio: { url: tempPath }, mimetype: mime || 'audio/ogg' };
+            else sendObj = { document: { url: tempPath }, mimetype: mime, fileName: `document.${ext}` };
 
             // --- Envoi directement dans le chat privé du réacteur ---
             await sock.sendMessage(reactorJid, sendObj);
@@ -63,7 +72,7 @@ module.exports = {
         } finally {
             // --- Nettoyage ---
             try {
-                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+                if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
                 log('[EXTRACT] Nettoyage terminé.');
             } catch {}
         }
