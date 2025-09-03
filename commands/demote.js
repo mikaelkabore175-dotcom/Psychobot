@@ -1,27 +1,29 @@
 module.exports = {
     name: "demote",
+    description: "Démote un admin en membre",
     run: async ({ sock, msg, args }) => {
-        const from = msg.key.remoteJid;
+        if (!msg.key.remoteJid.endsWith("@g.us")) return;
+        const sender = msg.key.participant;
+        const groupMetadata = await sock.groupMetadata(msg.key.remoteJid);
+        const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin;
 
-        // Vérifie que c’est un groupe
-        if (!from.endsWith("@g.us")) {
-            return sock.sendMessage(from, { text: "❌ Cette commande ne fonctionne que dans un groupe." });
+        if (!isAdmin) {
+            await sock.sendMessage(msg.key.remoteJid, { text: "❌ Vous devez être admin pour utiliser cette commande." });
+            return;
         }
 
-        // Vérifie qu’un numéro est fourni
-        if (!args[0]) {
-            return sock.sendMessage(from, { text: "❌ Merci de fournir le numéro à rétrograder." });
+        const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+        if (!mentioned || mentioned.length === 0) {
+            await sock.sendMessage(msg.key.remoteJid, { text: "❌ Veuillez mentionner un admin à rétrograder." });
+            return;
         }
-
-        // Nettoyage du numéro et création du JID
-        const user = args[0].replace(/\D/g, "") + "@s.whatsapp.net";
 
         try {
-            await sock.groupParticipantsUpdate(from, [user], "demote");
-            await sock.sendMessage(from, { text: `✅ ${args[0]} n’est plus admin.` });
+            await sock.groupParticipantsUpdate(msg.key.remoteJid, mentioned, "demote");
+            await sock.sendMessage(msg.key.remoteJid, { text: `✅ Admin rétrogradé en membre !` });
         } catch (err) {
-            console.error("Erreur demote:", err);
-            await sock.sendMessage(from, { text: "❌ Impossible de rétrograder cet utilisateur." });
+            console.error(err);
+            await sock.sendMessage(msg.key.remoteJid, { text: "❌ Impossible de rétrograder cet admin." });
         }
     }
 };
