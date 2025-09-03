@@ -1,19 +1,33 @@
 module.exports = {
     name: "delete",
+    description: "Supprime n’importe quel message dans le groupe (le bot doit être admin).",
+    adminOnly: false,
     run: async ({ sock, msg }) => {
         const from = msg.key.remoteJid;
 
-        // Si c'est une réponse à un message
-        const targetMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        if (!targetMsg) {
+        // Vérifie si c'est une réponse à un message
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        const stanzaId = msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+        const participant = msg.message?.extendedTextMessage?.contextInfo?.participant;
+
+        if (!quoted || !stanzaId) {
             return sock.sendMessage(from, { text: "❌ Réponds à un message pour le supprimer." });
         }
 
         try {
-            await sock.sendMessage(from, { delete: msg.message.extendedTextMessage.contextInfo.stanzaId });
+            // Envoie la requête de suppression
+            await sock.sendMessage(from, {
+                delete: {
+                    remoteJid: from,
+                    fromMe: false,
+                    id: stanzaId,
+                    participant: participant
+                }
+            });
+            console.log(`[DELETE] Message supprimé par le bot dans ${from}`);
         } catch (err) {
-            console.error("Erreur delete:", err);
-            await sock.sendMessage(from, { text: "❌ Impossible de supprimer ce message." });
+            console.error("[DELETE] Impossible de supprimer le message :", err);
+            await sock.sendMessage(from, { text: "❌ Impossible de supprimer ce message. Assure-toi que le bot est admin." });
         }
     }
 };
