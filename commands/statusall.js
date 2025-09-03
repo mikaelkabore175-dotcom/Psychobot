@@ -1,23 +1,42 @@
-const { downloadMediaMessage } = require("@whiskeysockets/baileys");
+const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+const fs = require("fs");
+const path = require("path");
 
 module.exports = {
     name: "statusall",
+    description: "Récupère et renvoie les statuts récents",
     run: async ({ sock, msg }) => {
         const from = msg.key.remoteJid;
 
         try {
-            const statusList = await sock.statusBroadcast(); // récupère les statuts récents
-            if (!statusList || statusList.length === 0) {
+            // Récupère les statuts via le JID spécial
+            const statusJid = "status@broadcast";
+            const statusMessages = await sock.fetchStatusUpdates(statusJid);
+
+            if (!statusMessages || statusMessages.length === 0) {
                 return sock.sendMessage(from, { text: "❌ Aucun statut trouvé." });
             }
 
-            for (let status of statusList) {
-                const jid = status.id.split("_")[0] + "@s.whatsapp.net";
+            for (let st of statusMessages) {
+                const jid = st.key?.participant || st.key?.remoteJid || "inconnu";
 
-                // Télécharge le média si c'est une image ou vidéo
-                if (status.mimetype) {
-                    const buffer = await downloadMediaMessage({ message: status }, "buffer", {}, { logger: require("pino")({ level: "silent" }) });
-                    await sock.sendMessage(from, { text: `📌 Statut de ${jid} vu !` });
+                // Vérifie si c’est une image, vidéo ou texte
+                const mediaMsg = st.message?.imageMessage || st.message?.videoMessage;
+                const textMsg = st.message?.extendedTextMessage?.text || st.message?.conversation;
+
+                if (mediaMsg) {
+                    // Téléchargement du média
+                    let buffer = Buffer.from([]);
+                    const stream = await downloadContentFromMessage(mediaMsg, mediaMsg.mimetype.startsWith("image") ? "image" : "video");
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    // Envoi du média au chat
+                    await sock.sendMessage(from, {
+                        [mediaMsg.mimetype.startsWith("image") ? "image" : "video"]: buffer,
+                        caption: `📌 Statut de ${jid}`,
+                    });
+                } else if (textMsg) {
+                    await sock.sendMessage(from, { text: `📝 Statut de ${jid}:\n\n${textMsg}` });
                 }
             }
 
