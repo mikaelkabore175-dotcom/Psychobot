@@ -4,6 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const log = require('../logger')(module);
 
+function getQuotedOrMainMessage(msg) {
+    return (
+        msg.message?.extendedTextMessage?.contextInfo?.quotedMessage ||
+        msg.message?.ephemeralMessage?.message ||
+        msg.message?.viewOnceMessage?.message ||
+        msg.message?.viewOnceMessageV2?.message ||
+        msg.message?.viewOnceMessageV2Extension?.message ||
+        msg.message
+    );
+}
+
 module.exports = {
     name: 'extract',
     description: 'Extrait et sauvegarde un média (image, vidéo, audio, document), y compris view once.',
@@ -17,21 +28,27 @@ module.exports = {
 
             const remoteJid = msg.key.remoteJid;
             const reactorJid = msg.key.participant || remoteJid;
-            const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
-
-            // --- Gérer view once ---
-            const mediaMsg = quoted.viewOnceMessage?.message 
-                          || quoted.viewOnceMessageV2?.message 
-                          || quoted;
+            
+            // --- Récupère le message pertinent ---
+            const quoted = getQuotedOrMainMessage(msg);
 
             // --- Détecter type média ---
-            const mediaType = mediaMsg.imageMessage ? 'image' :
-                              mediaMsg.videoMessage ? 'video' :
-                              mediaMsg.audioMessage ? 'audio' :
-                              mediaMsg.documentMessage ? 'document' : null;
+            const mediaMsg = quoted.imageMessage ? quoted :
+                             quoted.videoMessage ? quoted :
+                             quoted.audioMessage ? quoted :
+                             quoted.documentMessage ? quoted :
+                             quoted.viewOnceMessage?.message ||
+                             quoted.viewOnceMessageV2?.message ||
+                             quoted.viewOnceMessageV2Extension?.message ||
+                             null;
+
+            const mediaType = mediaMsg?.imageMessage ? 'image' :
+                              mediaMsg?.videoMessage ? 'video' :
+                              mediaMsg?.audioMessage ? 'audio' :
+                              mediaMsg?.documentMessage ? 'document' : null;
 
             if (!mediaType) {
-                return replyWithTag(sock, remoteJid, msg, "❌ Veuillez réagir à une image, vidéo, audio ou document (view once inclus).");
+                return replyWithTag(sock, remoteJid, msg, "❌ Veuillez répondre à une image, vidéo, audio ou document (view once inclus).");
             }
 
             const mime = mediaMsg[`${mediaType}Message`]?.mimetype || '';
