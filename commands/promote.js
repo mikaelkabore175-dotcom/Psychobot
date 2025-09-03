@@ -1,27 +1,29 @@
 module.exports = {
     name: "promote",
+    description: "Promote un membre en admin",
     run: async ({ sock, msg, args }) => {
-        const from = msg.key.remoteJid;
+        if (!msg.key.remoteJid.endsWith("@g.us")) return;
+        const sender = msg.key.participant;
+        const groupMetadata = await sock.groupMetadata(msg.key.remoteJid);
+        const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin;
 
-        // Vérifie que c’est bien un groupe
-        if (!from.endsWith("@g.us")) {
-            return sock.sendMessage(from, { text: "❌ Cette commande ne fonctionne que dans un groupe." });
+        if (!isAdmin) {
+            await sock.sendMessage(msg.key.remoteJid, { text: "❌ Vous devez être admin pour utiliser cette commande." });
+            return;
         }
 
-        // Vérifie qu’un numéro est fourni
-        if (!args[0]) {
-            return sock.sendMessage(from, { text: "❌ Merci de fournir le numéro à promouvoir." });
+        const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+        if (!mentioned || mentioned.length === 0) {
+            await sock.sendMessage(msg.key.remoteJid, { text: "❌ Veuillez mentionner un membre à promouvoir." });
+            return;
         }
-
-        // Nettoyage du numéro et création du JID
-        const user = args[0].replace(/\D/g, "") + "@s.whatsapp.net";
 
         try {
-            await sock.groupParticipantsUpdate(from, [user], "promote");
-            await sock.sendMessage(from, { text: `✅ ${args[0]} a été promu admin !` });
+            await sock.groupParticipantsUpdate(msg.key.remoteJid, mentioned, "promote");
+            await sock.sendMessage(msg.key.remoteJid, { text: `✅ Membre promu admin !` });
         } catch (err) {
-            console.error("Erreur promotion:", err);
-            await sock.sendMessage(from, { text: "❌ Impossible de promouvoir cet utilisateur." });
+            console.error(err);
+            await sock.sendMessage(msg.key.remoteJid, { text: "❌ Impossible de promouvoir ce membre." });
         }
     }
 };
