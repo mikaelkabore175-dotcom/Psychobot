@@ -1,6 +1,6 @@
 // index.js
 const express = require('express');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, jidDecode } = require('@whiskeysockets/baileys');
 const QRCode = require("qrcode");
 const pino = require("pino");
 const fs = require("fs");
@@ -12,24 +12,30 @@ const AUTH_FOLDER = path.join(__dirname, "auth_info");
 const PREFIX = "!";
 const BOT_NAME = "PSYCHO BOT";
 const BOT_TAG = `*${BOT_NAME}* 👨🏻‍💻`;
-const TARGET_NUMBER = "237696814391"; // Numéro cible pour MP3/mentions
+const TARGET_NUMBER = "237696814391"; // Numéro cible
 
-let latestQR = null; // Stocke le QR actuel
+let latestQR = null; // QR actuel
 
-// --- Loader de commandes ---
+// --- Loader commandes ---
 const commands = new Map();
 const commandFolder = path.join(__dirname, 'commands');
 if (!fs.existsSync(commandFolder)) fs.mkdirSync(commandFolder);
 
-fs.readdirSync(commandFolder).filter(f => f.endsWith('.js')).forEach(file => {
-    try {
-        const command = require(path.join(commandFolder, file));
-        commands.set(command.name, command);
-        console.log(`[CommandLoader] Commande chargée : ${command.name}`);
-    } catch (err) {
-        console.error(`[CommandLoader] Erreur de chargement de ${file}:`, err);
-    }
-});
+function loadCommands() {
+    commands.clear();
+    fs.readdirSync(commandFolder).filter(f => f.endsWith('.js')).forEach(file => {
+        try {
+            const fullPath = path.join(commandFolder, file);
+            delete require.cache[require.resolve(fullPath)]; // évite le cache
+            const command = require(fullPath);
+            commands.set(command.name, command);
+            console.log(`[CommandLoader] Commande chargée : ${command.name}`);
+        } catch (err) {
+            console.error(`[CommandLoader] Erreur chargement ${file}:`, err);
+        }
+    });
+}
+loadCommands();
 
 // --- Fonctions utilitaires ---
 function replyWithTag(sock, jid, quoted, text) {
@@ -45,10 +51,15 @@ function getMessageText(msg) {
 // --- Chargement du MP3 principal ---
 let mp3Buffer = null;
 try {
-    mp3Buffer = fs.readFileSync(path.join(__dirname, 'fichier.mp3'));
-    console.log('[MP3] fichier.mp3 chargé.');
+    const mp3Path = path.join(__dirname, 'fichier.mp3');
+    if (fs.existsSync(mp3Path)) {
+        mp3Buffer = fs.readFileSync(mp3Path);
+        console.log('[MP3] fichier.mp3 chargé.');
+    } else {
+        console.warn('[MP3] fichier.mp3 introuvable.');
+    }
 } catch (err) {
-    console.error('[MP3] Impossible de lire fichier.mp3:', err);
+    console.error('[MP3] Erreur lecture fichier.mp3:', err);
 }
 
 // --- Démarrage du bot ---
@@ -61,6 +72,7 @@ async function startBot() {
         version,
         auth: state,
         logger: pino({ level: "silent" }),
+        printQRInTerminal: false,
     });
 
     sock.ev.on("connection.update", update => {
@@ -174,14 +186,15 @@ async function startBot() {
                 const reactorJid = reaction.key.participant || reaction.key.remoteJid;
                 const remoteJid = reaction.key.remoteJid;
 
-                const quotedMessage = reaction.message?.contextInfo?.quotedMessage;
-                const msgToExtract = quotedMessage ? { ...reaction, message: quotedMessage } : reaction;
+                // Charger le message original (plus fiable que reaction.message)
+                const originalMsg = await sock.loadMessage(remoteJid, reaction.key.id);
+                if (!originalMsg) continue;
 
                 const extractCommand = commands.get('extract');
                 if (extractCommand) {
                     await extractCommand.run({
                         sock,
-                        msg: msgToExtract,
+                        msg: originalMsg,
                         replyWithTag: async (s, jid, _, text) => {
                             await s.sendMessage(reactorJid, { text });
                         }
@@ -201,7 +214,7 @@ const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => res.send({ status: "online", botName: BOT_NAME, uptime: (new Date() - startTime)/1000 }));
 
-// Route HTML pour afficher le QR avec auto-refresh dynamique
+// Route HTML QR avec auto-refresh
 app.get("/qr", async (req, res) => {
     res.send(`
         <html>
@@ -210,22 +223,29 @@ app.get("/qr", async (req, res) => {
             <style>
                 body { display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif; }
                 img { width:300px; height:300px; margin:20px; }
+                #status { font-size:18px; margin-top:10px; }
             </style>
         </head>
         <body>
-            <h2>Scannez ce QR pour connecter ${BOT_NAME}</h2>
+            <h2>Connexion ${BOT_NAME}</h2>
             <img id="qrImg" src="" />
-            <p>Le QR se met à jour automatiquement toutes les 10s</p>
+            <p id="status"></p>
             <script>
                 async function fetchQR() {
                     try {
                         const res = await fetch('/qr-data');
                         const data = await res.json();
-                        if(data.qr) document.getElementById('qrImg').src = data.qr;
-                        else document.getElementById('qrImg').alt = "Bot déjà connecté ✅";
-                    } catch(err) {
-                        console.error(err);
-                    }
+                        const img = document.getElementById('qrImg');
+                        const status = document.getElementById('status');
+                        if(data.qr) {
+                            img.style.display = "block";
+                            img.src = data.qr;
+                            status.innerText = "📲 Scannez ce QR";
+                        } else {
+                            img.style.display = "none";
+                            status.innerText = "✅ Bot déjà connecté";
+                        }
+                    } catch(err) { console.error(err); }
                 }
                 fetchQR();
                 setInterval(fetchQR, 10000);
