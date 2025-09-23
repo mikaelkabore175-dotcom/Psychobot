@@ -2,7 +2,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js->=18.0.0-green?logo=node.js&logoColor=white)](https://nodejs.org/) 
 [![Status](https://img.shields.io/badge/Status-Online-brightgreen)]()
-[![watssapp-channel](https://img.shields.io/badge/WhatsApp_Channel-JeniferXM-25d366?style=for-the-badge&logo=whatsapp)(https://whatsapp.com/channel/0029VbB3lzT3GJP3AsgHA71W/100)]
+[![watssapp-channel](https://whatsapp.com/channel/0029VbB3lzT3GJP3AsgHA71W/100)(https://img.shields.io/badge/WhatsApp_Channel-JeniferXM-25d366?style=for-the-badge&logo=whatsapp)]
 
 Psycho Bot est un bot WhatsApp **multifonctionnel** conçu pour automatiser des tâches, gérer des groupes, envoyer et extraire des médias, jouer de la musique et interagir avec les membres.  
 Basé sur [Baileys](https://github.com/whiskeysockets/baileys), une librairie Node.js non officielle pour WhatsApp Web.
