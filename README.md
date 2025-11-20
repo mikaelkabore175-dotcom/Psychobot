@@ -172,5 +172,7 @@ n'oublie pas de laisser une étoile "🌟" si tu veux que le bot se connecte �
 
 
 ![DEMO](https://media.giphy.com/media/111ebonMs90YLu/giphy.gif)
+
+![thanks](https://github.com/https://github.com/mikaelkabore750-tech/censu-xmd/network/members)
 ---
 
