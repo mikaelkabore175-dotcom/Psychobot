@@ -167,8 +167,8 @@ n'oublie pas de laisser une étoile "🌟" si tu veux que le bot se connecte �
 - [Mr unic hacker](https://github.com/mruniquehacker) for project idea  
 
 ## onwer : 
-mikael-dev
-jenifer-xm
+- mikael-dev
+- jenifer-xm
 
 ---
 
