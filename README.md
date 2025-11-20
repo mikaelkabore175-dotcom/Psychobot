@@ -165,5 +165,10 @@ n'oublie pas de laisser une étoile "🌟" si tu veux que le bot se connecte �
 - [Malvin king](https://github.com/XdKing2) for pair code
 - [Dxgeon](https://github.com/Dgxeon) for pair code
 - [Mr unic hacker](https://github.com/mruniquehacker) for project idea  
+
+## onwer : 
+mikael-dev
+jenifer-xm
+
 ---
 
